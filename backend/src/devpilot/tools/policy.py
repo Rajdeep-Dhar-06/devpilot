@@ -18,6 +18,10 @@ class ToolPolicy:
                 "list_directory",
                 "web_search",
                 "retrieve_past_solutions",
+                # GitHub MCP tools
+                "get_issue",
+                "search_issues",
+                "get_issue_comments",
             },
             "implementer": {
                 "read_file",
@@ -31,6 +35,9 @@ class ToolPolicy:
                 "read_file",
                 "list_directory",
                 "bash",  # Bounded strictly to read-only commands by CommandPolicy
+                # GitHub MCP tools (read-only context)
+                "get_issue",
+                "get_issue_comments",
             },
             "worker": {
                 "read_file",

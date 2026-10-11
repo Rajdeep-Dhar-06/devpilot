@@ -17,6 +17,7 @@ class DevPilotState(TypedDict, total=False):
 
     # Initial Input & Run Counters
     issue_url: str
+    github_token: str | None  # Per-user GitHub authentication token (Decision 20)
     repair_attempts: int  # Defined once, starts at 0, incremented by QA routing
     plan_revisions: int  # Starts at 0, tracks HITL plan revisions
 

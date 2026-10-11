@@ -1,28 +1,20 @@
-"""GitHub integration via GitHub MCP server and REST API.
+"""GitHub integration using official hosted GitHub MCP server over HTTP.
 
-Implements Decision 20:
-- Uses langchain_mcp_adapters.client.MultiServerMCPClient for MCP tools.
-- Containerized stdio transport invoking ghcr.io/github/github-mcp-server.
-- Directly invokes create_pull_request tool in the PR Node without an extra LLM agent.
+Enables per-user token isolation: each client connects using the user's token.
 """
 
 from typing import Any
 
-import httpx
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
-from devpilot.core.exceptions import GitHubIntegrationError
 from devpilot.domain.issue import GitHubIssue
 
 
-def build_github_mcp_client(
+def get_github_mcp_client(
     token: str,
-    endpoint_url: str = "https://api.githubcopilot.com/mcp/x/pull_requests",
+    endpoint_url: str = "https://api.githubcopilot.com/mcp/",
 ) -> MultiServerMCPClient:
-    """Builds a MultiServerMCPClient connected directly to GitHub's hosted remote MCP server.
-
-    Connects over HTTP to the official GitHub MCP endpoint with Bearer authentication.
-    """
+    """Builds a per-user MultiServerMCPClient connected to the remote GitHub MCP endpoint."""
     connection: dict[str, Any] = {
         "transport": "http",
         "url": endpoint_url,
@@ -31,6 +23,31 @@ def build_github_mcp_client(
         },
     }
     return MultiServerMCPClient({"github": connection})  # type: ignore[dict-item]
+
+
+async def fetch_issue_via_mcp(
+    mcp_client: MultiServerMCPClient,
+    owner: str,
+    repo: str,
+    issue_number: int,
+) -> GitHubIssue:
+    """Invokes GitHub MCP 'get_issue' tool to retrieve normalized issue metadata."""
+    tools = await mcp_client.get_tools()
+    tool = next((t for t in tools if t.name == "get_issue"), None)
+    if not tool:
+        raise RuntimeError("GitHub MCP 'get_issue' tool not found on server.")
+
+    data = await tool.ainvoke({"owner": owner, "repo": repo, "issue_number": issue_number})
+    labels = [lbl["name"] for lbl in data.get("labels", []) if "name" in lbl]
+
+    return GitHubIssue(
+        issue_id=data["number"],
+        issue_url=data["html_url"],
+        title=data["title"],
+        description=data.get("body") or "",
+        repository=f"{owner}/{repo}",
+        labels=labels,
+    )
 
 
 async def create_pull_request_via_mcp(
@@ -43,106 +60,24 @@ async def create_pull_request_via_mcp(
     body: str = "",
     draft: bool = False,
 ) -> str:
-    """Directly invokes the create_pull_request MCP tool to publish a PR (Decision 20).
-
-    Returns:
-        The URL or identifier of the created pull request.
-    """
+    """Directly invokes GitHub MCP 'create_pull_request' tool in PR Node without an extra LLM."""
     tools = await mcp_client.get_tools()
-    create_pr_tool = next(
-        (tool for tool in tools if tool.name == "create_pull_request"),
-        None,
-    )
-    if create_pr_tool is None:
-        raise GitHubIntegrationError("GitHub MCP tool 'create_pull_request' was not found.")
+    tool = next((t for t in tools if t.name == "create_pull_request"), None)
+    if not tool:
+        raise RuntimeError("GitHub MCP 'create_pull_request' tool not found on server.")
 
-    payload: dict[str, Any] = {
-        "owner": owner,
-        "repo": repo,
-        "title": title,
-        "head": head_branch,
-        "base": base_branch,
-        "body": body,
-        "draft": draft,
-    }
-
-    try:
-        result = await create_pr_tool.ainvoke(payload)
-        # Parse result (URL or dict output)
-        if isinstance(result, dict) and "html_url" in result:
-            return str(result["html_url"])
-        if isinstance(result, str) and result.startswith("http"):
-            return result
-        return str(result)
-    except Exception as err:
-        raise GitHubIntegrationError(f"GitHub MCP create_pull_request tool failed: {err}") from err
-
-
-class GitHubClient:
-    """Performs GitHub API operations using authenticated tokens."""
-
-    def __init__(self, token: str, base_url: str = "https://api.github.com") -> None:
-        self.token = token
-        self.base_url = base_url.rstrip("/")
-        self.headers = {
-            "Authorization": f"Bearer {self.token}",
-            "Accept": "application/vnd.github+json",
-            "X-GitHub-Api-Version": "2022-11-28",
-        }
-
-    def get_issue(self, repo_slug: str, issue_number: int) -> GitHubIssue:
-        """Retrieves and normalizes GitHub issue metadata."""
-        url = f"{self.base_url}/repos/{repo_slug}/issues/{issue_number}"
-        try:
-            with httpx.Client(timeout=15.0) as client:
-                resp = client.get(url, headers=self.headers)
-                if resp.status_code != 200:
-                    raise GitHubIntegrationError(
-                        f"Failed fetching issue {repo_slug}#{issue_number} "
-                        f"(status {resp.status_code}): {resp.text}"
-                    )
-                data = resp.json()
-                labels = [label["name"] for label in data.get("labels", []) if "name" in label]
-                return GitHubIssue(
-                    issue_id=data["number"],
-                    issue_url=data["html_url"],
-                    title=data["title"],
-                    description=data.get("body") or "",
-                    repository=repo_slug,
-                    labels=labels,
-                )
-        except Exception as err:
-            if isinstance(err, GitHubIntegrationError):
-                raise
-            raise GitHubIntegrationError(f"HTTP request to get issue failed: {err}") from err
-
-    def create_pull_request(
-        self,
-        repo_slug: str,
-        title: str,
-        body: str,
-        head_branch: str,
-        base_branch: str = "main",
-    ) -> str:
-        """Creates a GitHub pull request and returns the resulting HTML URL."""
-        url = f"{self.base_url}/repos/{repo_slug}/pulls"
-        payload = {
+    result = await tool.ainvoke(
+        {
+            "owner": owner,
+            "repo": repo,
             "title": title,
-            "body": body,
             "head": head_branch,
             "base": base_branch,
+            "body": body,
+            "draft": draft,
         }
-        try:
-            with httpx.Client(timeout=15.0) as client:
-                resp = client.post(url, headers=self.headers, json=payload)
-                if resp.status_code != 201:
-                    raise GitHubIntegrationError(
-                        f"Failed creating PR for {repo_slug} "
-                        f"(status {resp.status_code}): {resp.text}"
-                    )
-                data = resp.json()
-                return str(data["html_url"])
-        except Exception as err:
-            if isinstance(err, GitHubIntegrationError):
-                raise
-            raise GitHubIntegrationError(f"HTTP request to create PR failed: {err}") from err
+    )
+
+    if isinstance(result, dict) and "html_url" in result:
+        return str(result["html_url"])
+    return str(result)
