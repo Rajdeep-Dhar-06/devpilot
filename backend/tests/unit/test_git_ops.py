@@ -3,7 +3,7 @@ from unittest.mock import MagicMock
 import pytest
 
 from devpilot.core.exceptions import BranchVerificationError
-from devpilot.sandbox.git_ops import GitOps
+from devpilot.sandbox.workspace import Workspace
 
 
 def test_verify_branch_success() -> None:
@@ -13,7 +13,7 @@ def test_verify_branch_success() -> None:
         MagicMock(stdout="devpilot/issue-42\n", exit_code=0),  # current branch
         MagicMock(stdout="3\n", exit_code=0),  # commit count diff
     ]
-    git_ops = GitOps(sandbox=sandbox, repo_path="/workspace/repo")
+    git_ops = Workspace(sandbox=sandbox, repo_path="/workspace/repo")
     # Should succeed without error
     git_ops.verify_branch(expected_branch="devpilot/issue-42", base_branch="main")
 
@@ -21,7 +21,7 @@ def test_verify_branch_success() -> None:
 def test_verify_branch_mismatch_raises() -> None:
     sandbox = MagicMock()
     sandbox.exec.return_value = MagicMock(stdout="main\n", exit_code=0)
-    git_ops = GitOps(sandbox=sandbox, repo_path="/workspace/repo")
+    git_ops = Workspace(sandbox=sandbox, repo_path="/workspace/repo")
 
     with pytest.raises(BranchVerificationError, match="Branch mismatch"):
         git_ops.verify_branch(expected_branch="devpilot/issue-42", base_branch="main")
@@ -34,7 +34,7 @@ def test_verify_branch_no_changes_raises() -> None:
         MagicMock(stdout="0\n", exit_code=0),  # 0 commits ahead
         MagicMock(stdout="", exit_code=0),  # git status clean
     ]
-    git_ops = GitOps(sandbox=sandbox, repo_path="/workspace/repo")
+    git_ops = Workspace(sandbox=sandbox, repo_path="/workspace/repo")
 
     with pytest.raises(BranchVerificationError, match="No modifications found"):
         git_ops.verify_branch(expected_branch="devpilot/issue-42", base_branch="main")
@@ -48,7 +48,7 @@ def test_push_branch_token_cleanup_on_failure() -> None:
         MagicMock(exit_code=1, stderr="Remote rejected"),  # git push fails
         MagicMock(exit_code=0),  # cleanup set-url without token
     ]
-    git_ops = GitOps(sandbox=sandbox, repo_path="/workspace/repo")
+    git_ops = Workspace(sandbox=sandbox, repo_path="/workspace/repo")
 
     with pytest.raises(RuntimeError, match="Git push failed"):
         git_ops.push_branch(
