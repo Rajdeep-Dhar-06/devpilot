@@ -44,6 +44,9 @@ class PublicationDecision(StrEnum):
     REJECT = "reject"
 
 
+PRDecision = PublicationDecision
+
+
 class TaskStatus(StrEnum):
     """Overall workflow lifecycle status."""
 
@@ -53,7 +56,7 @@ class TaskStatus(StrEnum):
     IMPLEMENTING = "implementing"
     TESTING_AND_REVIEWING = "testing_and_reviewing"
     QA_EVALUATING = "qa_evaluating"
-    AWAITING_PUBLICATION_APPROVAL = "awaiting_publication_approval"
+    AWAITING_PR_APPROVAL = "awaiting_publication_approval"
     PUBLISHED = "published"
     FAILED = "failed"
     REJECTED = "rejected"

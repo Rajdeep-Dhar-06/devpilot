@@ -6,15 +6,22 @@ class ImplementationPlan(BaseModel):
 
     problem_summary: str = Field(..., description="Concise analysis of the problem")
     relevant_files: list[str] = Field(
-        default_factory=list, description="Target files and modules"
+        default_factory=list,
+        description="Target files and modules",
     )
     proposed_changes: list[str] = Field(
-        default_factory=list, description="High-level architectural changes"
+        default_factory=list,
+        description="High-level architectural changes",
     )
     implementation_steps: list[str] = Field(
-        default_factory=list, description="Step-by-step implementation plan"
+        default_factory=list,
+        description="Step-by-step implementation plan",
     )
     testing_expectations: str = Field(
-        ..., description="Verification strategy and commands to execute"
+        ...,
+        description="Verification strategy and commands to execute",
     )
-    potential_risks: str = Field(..., description="Risks, regressions, or edge cases to watch for")
+    potential_risks: str = Field(
+        ...,
+        description="Risks, regressions, or edge cases to watch for",
+    )
