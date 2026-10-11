@@ -243,26 +243,20 @@ Living record of architectural decisions made during design mode. No code is wri
 - **Trade-offs accepted:** The Implementation Agent prompt must teach it to handle this error.
 - **Still open:** A per-worker step and time limit was recommended with this choice, so that a stuck worker cannot hold a slot forever. It has not been confirmed. Without it, a stuck worker permanently consumes one of the 5 slots.
 
-## Decision 20: MCP Server Standard (`MultiServerMCPClient`)
+## Decision 20: Remote MCP Server Standard (`MultiServerMCPClient`)
 
-- **Decision:** All MCP integrations (including GitHub MCP) must use `langchain_mcp_adapters.client.MultiServerMCPClient` with containerized/stdio transport.
+- **Decision:** All MCP integrations (including GitHub MCP) must connect directly to hosted/remote MCP endpoints using `langchain_mcp_adapters.client.MultiServerMCPClient` over HTTP. No local Docker daemon or local MCP container process required.
 - **PR Node Execution:** Inside the PR Node, the `create_pull_request` tool is retrieved from `MultiServerMCPClient` and invoked directly via Python (`await create_pr.ainvoke({...})`). An LLM agent is not used for PR creation because branch, title, and body are already known deterministically.
-- **Transport configuration for GitHub MCP:**
+- **Transport configuration for Remote GitHub MCP:**
   ```python
   MultiServerMCPClient({
       "github": {
-          "transport": "stdio",
-          "command": "docker",
-          "args": [
-              "run", "-i", "--rm",
-              "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
-              "-e", "GITHUB_TOOLS=create_pull_request",
-              "ghcr.io/github/github-mcp-server",
-          ],
-          "env": {
-              "GITHUB_PERSONAL_ACCESS_TOKEN": token
+          "transport": "http",
+          "url": "https://api.githubcopilot.com/mcp/x/pull_requests",
+          "headers": {
+              "Authorization": f"Bearer {token}",
           },
       }
   })
   ```
-- **Trade-offs accepted:** Requires Docker engine to run `ghcr.io/github/github-mcp-server` during production PR creation. Direct invocation remains 100% deterministic, type-safe, and zero-token overhead.
+- **Trade-offs accepted:** Requires internet connectivity to reach `https://api.githubcopilot.com/mcp/` and valid GitHub token. Eliminates local Docker requirement, simplifying backend deployment and execution.

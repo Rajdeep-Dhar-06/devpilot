@@ -15,33 +15,22 @@ from devpilot.core.exceptions import GitHubIntegrationError
 from devpilot.domain.issue import GitHubIssue
 
 
-def build_github_mcp_client(token: str) -> MultiServerMCPClient:
-    """Builds a MultiServerMCPClient configured for the official GitHub MCP server.
+def build_github_mcp_client(
+    token: str,
+    endpoint_url: str = "https://api.githubcopilot.com/mcp/x/pull_requests",
+) -> MultiServerMCPClient:
+    """Builds a MultiServerMCPClient connected directly to GitHub's hosted remote MCP server.
 
-    Runs ghcr.io/github/github-mcp-server inside a lightweight Docker container
-    communicating over stdio.
+    Connects over HTTP to the official GitHub MCP endpoint with Bearer authentication.
     """
-    return MultiServerMCPClient(
-        {
-            "github": {
-                "transport": "stdio",
-                "command": "docker",
-                "args": [
-                    "run",
-                    "-i",
-                    "--rm",
-                    "-e",
-                    "GITHUB_PERSONAL_ACCESS_TOKEN",
-                    "-e",
-                    "GITHUB_TOOLS=create_pull_request",
-                    "ghcr.io/github/github-mcp-server",
-                ],
-                "env": {
-                    "GITHUB_PERSONAL_ACCESS_TOKEN": token,
-                },
-            }
-        }
-    )
+    connection: dict[str, Any] = {
+        "transport": "http",
+        "url": endpoint_url,
+        "headers": {
+            "Authorization": f"Bearer {token}",
+        },
+    }
+    return MultiServerMCPClient({"github": connection})  # type: ignore[dict-item]
 
 
 async def create_pull_request_via_mcp(
