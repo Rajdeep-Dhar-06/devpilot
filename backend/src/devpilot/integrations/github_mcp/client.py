@@ -25,7 +25,7 @@ def get_github_mcp_client(
     return MultiServerMCPClient({"github": connection})  # type: ignore[dict-item]
 
 
-async def fetch_issue_via_mcp(
+async def fetch_issue(
     mcp_client: MultiServerMCPClient,
     owner: str,
     repo: str,
@@ -50,7 +50,7 @@ async def fetch_issue_via_mcp(
     )
 
 
-async def create_pull_request_via_mcp(
+async def create_pull_request(
     mcp_client: MultiServerMCPClient,
     owner: str,
     repo: str,
@@ -60,7 +60,7 @@ async def create_pull_request_via_mcp(
     body: str = "",
     draft: bool = False,
 ) -> str:
-    """Directly invokes GitHub MCP 'create_pull_request' tool in PR Node without an extra LLM."""
+    """Directly invokes GitHub MCP 'create_pull_request' tool"""
     tools = await mcp_client.get_tools()
     tool = next((t for t in tools if t.name == "create_pull_request"), None)
     if not tool:
@@ -81,3 +81,8 @@ async def create_pull_request_via_mcp(
     if isinstance(result, dict) and "html_url" in result:
         return str(result["html_url"])
     return str(result)
+
+
+# Aliases for explicit naming
+fetch_issue_via_mcp = fetch_issue
+create_pull_request_via_mcp = create_pull_request

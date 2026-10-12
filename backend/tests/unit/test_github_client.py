@@ -42,9 +42,7 @@ async def test_fetch_issue_via_mcp() -> None:
     assert issue.title == "Fix division bug"
     assert issue.repository == "org/repo"
     assert issue.labels == ["bug"]
-    mock_tool.ainvoke.assert_awaited_once_with(
-        {"owner": "org", "repo": "repo", "issue_number": 42}
-    )
+    mock_tool.ainvoke.assert_awaited_once_with({"owner": "org", "repo": "repo", "issue_number": 42})
 
 
 @pytest.mark.asyncio

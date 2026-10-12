@@ -87,4 +87,49 @@ class ToolRegistry:
 
             tools.append(bash)
 
+        if "delegate_work" in allowed_names:
+
+            @tool
+            async def delegate_work(task: str, declared_files: list[str]) -> str:
+                """Delegate an isolated, scoped task to a parallel worker subagent.
+
+                Args:
+                    task: Detailed description of the subtask for the worker to complete.
+                    declared_files: Exclusive list of files this worker is permitted to modify.
+                """
+                import uuid
+
+                from langchain_core.messages import HumanMessage
+
+                from devpilot.agents.base import build_agent, load_prompt
+
+                worker_id = f"worker-{uuid.uuid4().hex[:6]}"
+                self.worker_manager.register_worker(
+                    worker_id=worker_id,
+                    task=task,
+                    declared_files=declared_files,
+                )
+                try:
+                    worker_tools = self.get_tools_for_role("worker")
+                    worker_prompt = (
+                        load_prompt("worker")
+                        + f"\n\nAssigned Task: {task}\nDeclared File Scope: {declared_files}"
+                    )
+                    worker_agent = build_agent(
+                        role="worker",
+                        tools=worker_tools,
+                        system_prompt=worker_prompt,
+                    )
+                    res = await worker_agent.ainvoke(
+                        {"messages": [HumanMessage(content=f"Execute task: {task}")]}
+                    )
+                    messages = res.get("messages", [])
+                    if messages:
+                        return str(messages[-1].content)
+                    return "Task completed successfully."
+                finally:
+                    self.worker_manager.complete_worker(worker_id)
+
+            tools.append(delegate_work)
+
         return tools
