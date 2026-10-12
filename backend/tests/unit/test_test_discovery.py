@@ -1,35 +1,52 @@
-from devpilot.sandbox.test_discovery import TestCommandDiscovery
+"""Unit tests for test command discovery in Sandbox (Decision 6)."""
+
+from unittest.mock import MagicMock
+
+from devpilot.sandbox import ExecResult, Sandbox
 
 
 def test_discover_from_explicit_config() -> None:
-    discovery = TestCommandDiscovery()
-    files = {"devpilot.json": '{"test_command": "pytest -m unit", "lint_command": "ruff check"}'}
-    result = discovery.discover(files=files)
-    assert result.test_command == "pytest -m unit"
-    assert result.lint_command == "ruff check"
-    assert result.source == "config"
+    """Verifies that devpilot.json explicit configuration takes precedence."""
+    mock_instance = MagicMock()
+    sandbox = Sandbox(instance=mock_instance)
+    mock_instance.commands.run.return_value = ExecResult(
+        stdout='{"test_command": "pytest -m unit", "lint_command": "ruff check"}',
+        stderr="",
+        exit_code=0,
+    )
+
+    result = sandbox.discover_tests()
+    assert result["test_command"] == "pytest -m unit"
+    assert result["lint_command"] == "ruff check"
+    assert result["source"] == "config"
 
 
-def test_discover_auto_detect_python_pytest() -> None:
-    discovery = TestCommandDiscovery()
-    files = {"pyproject.toml": "[tool.pytest.ini_options]\npythonpath = ['src']"}
-    result = discovery.discover(files=files)
-    assert result.test_command == "pytest"
-    assert result.source == "auto_detected"
+def test_discover_auto_detect_pyproject() -> None:
+    """Verifies that pyproject.toml triggers auto-detection of pytest, ruff, and mypy."""
+    mock_instance = MagicMock()
+    sandbox = Sandbox(instance=mock_instance)
+    mock_instance.commands.run.side_effect = [
+        ExecResult(stdout="", stderr="File not found", exit_code=1),  # no devpilot.json
+        ExecResult(stdout="[tool.pytest]", stderr="", exit_code=0),  # pyproject.toml exists
+    ]
 
-
-def test_discover_auto_detect_makefile() -> None:
-    discovery = TestCommandDiscovery()
-    files = {"Makefile": "test:\n\tpytest\nlint:\n\truff"}
-    result = discovery.discover(files=files)
-    assert result.test_command == "make test"
-    assert result.source == "auto_detected"
+    result = sandbox.discover_tests()
+    assert result["test_command"] == "pytest"
+    assert result["lint_command"] == "ruff check"
+    assert result["typecheck_command"] == "mypy"
+    assert result["source"] == "auto_detected"
 
 
 def test_discover_no_command_found() -> None:
-    discovery = TestCommandDiscovery()
-    files = {"README.md": "# Project without tests"}
-    result = discovery.discover(files=files)
-    assert result.test_command is None
-    assert result.source == "not_found"
-    assert result.is_missing is True
+    """Verifies that absence of test files returns not_found status."""
+    mock_instance = MagicMock()
+    sandbox = Sandbox(instance=mock_instance)
+    mock_instance.commands.run.return_value = ExecResult(
+        stdout="",
+        stderr="File not found",
+        exit_code=1,
+    )
+
+    result = sandbox.discover_tests()
+    assert result["test_command"] is None
+    assert result["source"] == "not_found"

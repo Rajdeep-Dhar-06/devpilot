@@ -1,39 +1,16 @@
-from devpilot.domain.enums import (
-    PlanDecision,
-    PublicationDecision,
-    QAStatus,
-    ReviewCategory,
-    ReviewSeverity,
-)
-from devpilot.domain.failure import WorkflowFailure
-from devpilot.domain.implementation import ImplementationReport
-from devpilot.domain.issue import GitHubIssue
-from devpilot.domain.plan import ImplementationPlan
-from devpilot.domain.review import Finding, ReviewResult
-from devpilot.domain.verification import QAResult, TestResult
-from devpilot.domain.workspace import WorkspaceInfo
+"""Unit tests for shared and agent-specific Pydantic data models."""
+
+import pytest
+from pydantic import ValidationError
+
+from devpilot.agents.implementer.agent import ImplementationReport
+from devpilot.agents.planner.agent import ImplementationPlan
+from devpilot.agents.reviewer.agent import Finding, ReviewResult
+from devpilot.models import GitHubIssue, TestResult, WorkspaceInfo
 
 
-def test_domain_enums() -> None:
-    assert ReviewSeverity.CRITICAL.value == "critical"
-    assert ReviewSeverity.HIGH.value == "high"
-    assert ReviewSeverity.MEDIUM.value == "medium"
-    assert ReviewSeverity.LOW.value == "low"
-    assert ReviewSeverity.INFO.value == "info"
-
-    assert QAStatus.PASSED.value == "passed"
-    assert QAStatus.FIX_REQUIRED.value == "fix_required"
-    assert QAStatus.RETRY_LIMIT_REACHED.value == "retry_limit_reached"
-
-    assert PlanDecision.APPROVE.value == "approve"
-    assert PlanDecision.REVISE.value == "revise"
-    assert PlanDecision.REJECT.value == "reject"
-
-    assert PublicationDecision.APPROVE.value == "approve"
-    assert PublicationDecision.REJECT.value == "reject"
-
-
-def test_domain_models_creation() -> None:
+def test_shared_models_instantiation() -> None:
+    """Verifies that shared models construct correctly with expected fields."""
     issue = GitHubIssue(
         issue_id=42,
         issue_url="https://github.com/org/repo/issues/42",
@@ -42,6 +19,7 @@ def test_domain_models_creation() -> None:
         repository="org/repo",
     )
     assert issue.issue_id == 42
+    assert issue.repository == "org/repo"
 
     workspace = WorkspaceInfo(
         sandbox_id="sbx-12345",
@@ -50,6 +28,17 @@ def test_domain_models_creation() -> None:
     )
     assert workspace.sandbox_id == "sbx-12345"
 
+    test_res = TestResult(
+        passed=False,
+        command="pytest",
+        output="1 failed, 2 passed",
+        exit_code=1,
+    )
+    assert test_res.passed is False
+
+
+def test_agent_specific_models() -> None:
+    """Verifies agent-specific output models: plan, report, and review result."""
     plan = ImplementationPlan(
         problem_summary="Fix divide by zero in calc.py",
         relevant_files=["src/calc.py"],
@@ -63,15 +52,14 @@ def test_domain_models_creation() -> None:
     report = ImplementationReport(
         changed_files=["src/calc.py"],
         status="completed",
-        tests_run=["pytest"],
-        remaining_risks="None",
-        blockers=None,
+        summary="Updated calc.py and ran pytest.",
     )
     assert report.changed_files == ["src/calc.py"]
+    assert report.status == "completed"
 
     finding = Finding(
-        category=ReviewCategory.SECURITY,
-        severity=ReviewSeverity.HIGH,
+        category="security",
+        severity="high",
         file_path="src/calc.py",
         line_number=10,
         message="Potential denial of service",
@@ -83,25 +71,25 @@ def test_domain_models_creation() -> None:
         verdict="fix_required",
     )
     assert len(review_res.findings) == 1
-    assert review_res.findings[0].severity == ReviewSeverity.HIGH
+    assert review_res.verdict == "fix_required"
 
-    test_res = TestResult(
-        passed=False,
-        command="pytest",
-        output="1 failed, 2 passed",
-        exit_code=1,
-    )
-    assert test_res.passed is False
 
-    qa_res = QAResult(
-        status=QAStatus.FIX_REQUIRED,
-        feedback="Fix failing tests and high security finding",
-        guardrail_override=True,
-    )
-    assert qa_res.guardrail_override is True
+def test_literal_field_validation() -> None:
+    """Verifies that invalid literal values trigger Pydantic validation errors."""
+    with pytest.raises(ValidationError):
+        # 'urgent' is not an allowed severity
+        Finding(
+            category="security",
+            severity="urgent",  # type: ignore[arg-type]
+            file_path="src/calc.py",
+            message="Bug",
+            suggestion="Fix",
+        )
 
-    failure = WorkflowFailure(
-        reason="Exceeded maximum repair attempts",
-        step="qa_evaluation",
-    )
-    assert failure.step == "qa_evaluation"
+    with pytest.raises(ValidationError):
+        # 'in_progress' is not an allowed report status
+        ImplementationReport(
+            changed_files=[],
+            status="in_progress",  # type: ignore[arg-type]
+            summary="Working on it",
+        )

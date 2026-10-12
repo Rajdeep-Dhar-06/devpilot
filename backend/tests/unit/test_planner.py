@@ -1,15 +1,17 @@
+"""Unit tests for Planner Agent."""
+
 from unittest.mock import AsyncMock, patch
 
 import pytest
 
-from devpilot.agents.planner import run_planner
-from devpilot.domain.issue import GitHubIssue
-from devpilot.domain.plan import ImplementationPlan
-from devpilot.domain.workspace import WorkspaceInfo
+from devpilot.agents.planner.agent import ImplementationPlan, plan_node
+from devpilot.models import GitHubIssue, WorkspaceInfo
+from devpilot.workflow import DevPilotState
 
 
 @pytest.mark.asyncio
-async def test_run_planner() -> None:
+async def test_plan_node() -> None:
+    """Verifies that plan_node runs the ReAct agent and returns an ImplementationPlan."""
     sample_issue = GitHubIssue(
         issue_id=42,
         issue_url="https://github.com/org/repo/issues/42",
@@ -36,14 +38,18 @@ async def test_run_planner() -> None:
     mock_agent = AsyncMock()
     mock_agent.ainvoke.return_value = {"structured_response": expected_plan}
 
-    with patch("devpilot.agents.planner.build_agent", return_value=mock_agent) as mock_build:
-        plan = await run_planner(
-            issue=sample_issue,
-            workspace=workspace,
-            tools=[],
-        )
+    state: DevPilotState = {
+        "issue": sample_issue,
+        "workspace": workspace,
+    }
 
-        assert plan == expected_plan
-        assert plan.problem_summary == "Fix ZeroDivisionError in divide function"
-        mock_build.assert_called_once()
+    with patch(
+        "devpilot.agents.planner.agent.create_react_agent", return_value=mock_agent
+    ) as mock_create:
+        res = await plan_node(state)
+
+        assert "plan" in res
+        assert res["plan"] == expected_plan
+        assert res["plan"].problem_summary == "Fix ZeroDivisionError in divide function"
+        mock_create.assert_called_once()
         mock_agent.ainvoke.assert_awaited_once()

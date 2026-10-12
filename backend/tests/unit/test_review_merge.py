@@ -1,12 +1,13 @@
-from devpilot.domain.enums import ReviewCategory, ReviewSeverity
-from devpilot.domain.review import Finding
-from devpilot.workflows.review.merge import merge_findings
+"""Unit tests for Review merge logic and severity evaluation (Decision 12)."""
+
+from devpilot.agents.reviewer.agent import Finding, merge_findings
 
 
 def test_merge_findings_deduplication() -> None:
+    """Verifies that identical findings from multiple reviewers are deduplicated."""
     finding_1 = Finding(
-        category=ReviewCategory.SECURITY,
-        severity=ReviewSeverity.HIGH,
+        category="security",
+        severity="high",
         file_path="src/calc.py",
         line_number=10,
         message="Potential injection vulnerability",
@@ -14,16 +15,16 @@ def test_merge_findings_deduplication() -> None:
     )
     # Duplicate finding reported with identical location and message
     finding_duplicate = Finding(
-        category=ReviewCategory.SECURITY,
-        severity=ReviewSeverity.HIGH,
+        category="security",
+        severity="high",
         file_path="src/calc.py",
         line_number=10,
         message="Potential injection vulnerability",
         suggestion="Sanitize input",
     )
     finding_distinct = Finding(
-        category=ReviewCategory.CODE_QUALITY,
-        severity=ReviewSeverity.LOW,
+        category="code_quality",
+        severity="low",
         file_path="src/calc.py",
         line_number=25,
         message="Variable name too short",
@@ -43,18 +44,18 @@ def test_merge_findings_deduplication() -> None:
 
 
 def test_merge_findings_security_never_dropped() -> None:
-    # A medium security finding must cause fix_required verdict (Decision 12)
+    """Verifies that a medium security finding forces fix_required and survives merge."""
     sec_finding = Finding(
-        category=ReviewCategory.SECURITY,
-        severity=ReviewSeverity.MEDIUM,
+        category="security",
+        severity="medium",
         file_path="src/auth.py",
         line_number=5,
         message="Token logging detected",
         suggestion="Redact token",
     )
     low_req_finding = Finding(
-        category=ReviewCategory.REQUIREMENT,
-        severity=ReviewSeverity.LOW,
+        category="requirement",
+        severity="low",
         file_path="src/calc.py",
         line_number=1,
         message="Minor docstring typo",
@@ -68,14 +69,15 @@ def test_merge_findings_security_never_dropped() -> None:
         edge_case_findings=[],
     )
 
-    assert any(f.category == ReviewCategory.SECURITY for f in result.findings)
+    assert any(f.category == "security" for f in result.findings)
     assert result.verdict == "fix_required"
 
 
 def test_merge_findings_all_passed() -> None:
+    """Verifies that info/low non-security findings result in a 'passed' verdict."""
     info_finding = Finding(
-        category=ReviewCategory.CODE_QUALITY,
-        severity=ReviewSeverity.INFO,
+        category="code_quality",
+        severity="info",
         file_path="src/calc.py",
         line_number=1,
         message="Code is clean and formatted",

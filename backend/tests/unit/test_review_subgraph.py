@@ -1,23 +1,26 @@
+"""Unit tests for the 4-reviewer parallel subgraph execution."""
+
 import pytest
 
-from devpilot.domain.enums import ReviewCategory, ReviewSeverity
-from devpilot.domain.issue import GitHubIssue
-from devpilot.domain.plan import ImplementationPlan
-from devpilot.domain.review import Finding
-from devpilot.domain.workspace import WorkspaceInfo
-from devpilot.workflows.review.graph import create_review_graph
-from devpilot.workflows.review.state import ReviewState
+from devpilot.agents.planner.agent import ImplementationPlan
+from devpilot.agents.reviewer.agent import (
+    Finding,
+    ReviewState,
+    build_review_graph,
+)
+from devpilot.models import GitHubIssue, WorkspaceInfo
 
 
 @pytest.mark.asyncio
 async def test_review_subgraph_execution() -> None:
-    # Build review graph with mock node runners
-    async def mock_security_node(state: ReviewState) -> dict[str, list[Finding]]:
+    """Verifies that the review graph runs parallel specialists and merges findings."""
+
+    async def mock_security(state: ReviewState) -> dict[str, list[Finding]]:
         return {
-            "security_findings": [
+            "findings": [
                 Finding(
-                    category=ReviewCategory.SECURITY,
-                    severity=ReviewSeverity.INFO,
+                    category="security",
+                    severity="info",
                     file_path="src/calc.py",
                     message="No security issues found",
                     suggestion="Looks good",
@@ -25,20 +28,20 @@ async def test_review_subgraph_execution() -> None:
             ]
         }
 
-    async def mock_requirement_node(state: ReviewState) -> dict[str, list[Finding]]:
-        return {"requirement_findings": []}
+    async def mock_requirement(state: ReviewState) -> dict[str, list[Finding]]:
+        return {"findings": []}
 
-    async def mock_code_quality_node(state: ReviewState) -> dict[str, list[Finding]]:
-        return {"code_quality_findings": []}
+    async def mock_code_quality(state: ReviewState) -> dict[str, list[Finding]]:
+        return {"findings": []}
 
-    async def mock_edge_case_node(state: ReviewState) -> dict[str, list[Finding]]:
-        return {"edge_case_findings": []}
+    async def mock_edge_case(state: ReviewState) -> dict[str, list[Finding]]:
+        return {"findings": []}
 
-    graph = create_review_graph(
-        security_node=mock_security_node,
-        requirement_node=mock_requirement_node,
-        code_quality_node=mock_code_quality_node,
-        edge_case_node=mock_edge_case_node,
+    graph = build_review_graph(
+        security_node=mock_security,
+        requirement_node=mock_requirement,
+        code_quality_node=mock_code_quality,
+        edge_case_node=mock_edge_case,
     )
 
     initial_state: ReviewState = {
@@ -63,10 +66,7 @@ async def test_review_subgraph_execution() -> None:
             repo_path="/workspace/repo",
             base_branch="main",
         ),
-        "security_findings": [],
-        "requirement_findings": [],
-        "code_quality_findings": [],
-        "edge_case_findings": [],
+        "findings": [],
     }
 
     final_state = await graph.ainvoke(initial_state)
