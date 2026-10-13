@@ -12,10 +12,17 @@ dependencies = [
     "langchain-openai>=0.1.0",
     "psycopg[binary,pool]>=3.1.0",
     "pgvector>=0.3.0",
-    "pyjwt>=2.15.1",
+    "pyjwt[crypto]>=2.15.1",
     "cryptography>=50.0.2",
     "e2b>=2.55.1",
     "langchain-mcp-adapters>=0.3.2",
+    "fastapi>=0.143.0",
+    "uvicorn[standard]>=0.54.0",
+    "httpx>=0.28.1",
+    "itsdangerous>=2.2.0",
+    "sqlalchemy>=2.1.4",
+    "psycopg2-binary>=2.9.13",
+    "alembic>=1.20.0",
 ]
 
 [project.optional-dependencies]
