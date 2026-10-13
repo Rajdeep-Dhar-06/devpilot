@@ -18,7 +18,7 @@ DevPilot transforms GitHub issues into verified pull requests by coordinating sp
 devpilot/
 ├── backend/               # Python application package (FastAPI, LangGraph, agents)
 │   ├── src/devpilot/      # Source tree (core, domain, workflows, agents, tools)
-│   └── tests/             # Unit and integration test suites
+├── docs/                  # Architecture, Data Model, and Observability specs
 ├── docker-compose.yml     # Local services (PostgreSQL + pgvector)
 ├── Makefile               # Task runner (test, lint, typecheck, db)
 └── design_doc.md          # Architectural decisions log
@@ -40,3 +40,14 @@ devpilot/
    ```bash
    make check
    ```
+
+## Observability
+
+DevPilot integrates with [Langfuse](https://langfuse.com) for end-to-end tracing across all LangGraph nodes, multi-agent review subgraphs, and tool calls.
+Configure the following in your `.env`:
+```bash
+LANGFUSE_PUBLIC_KEY="pk-lf-..."
+LANGFUSE_SECRET_KEY="sk-lf-..."
+LANGFUSE_HOST="https://cloud.langfuse.com"
+```
+If keys are omitted, tracing automatically acts as a zero-overhead no-op.

@@ -32,6 +32,7 @@ from devpilot.models import (
     QAStatus,
     TestResult,
 )
+from devpilot.observability import record_human_decision, record_qa_result
 from devpilot.sandbox import Sandbox
 
 __all__ = [
@@ -42,6 +43,7 @@ __all__ = [
     "ingest_issue_node",
     "publish_pr_node",
     "qa_node",
+    "record_human_decision",
     "route_plan_decision",
     "route_qa_verdict",
     "test_node",
@@ -136,16 +138,23 @@ async def review_node(state: DevPilotState, config: RunnableConfig | None = None
     return {"review_result": result.get("review_result")}
 
 
-def qa_node(state: DevPilotState) -> dict[str, Any]:
+def qa_node(
+    state: DevPilotState, config: RunnableConfig | None = None
+) -> dict[str, Any]:
     """Evaluates test and review results to decide whether repairs are required."""
     test_res: TestResult | None = state.get("test_result")
     review_res: ReviewResult | None = state.get("review_result")
     current_repairs = state.get("repair_attempts", 0)
 
+    # Extract trace id or run id if available in config metadata or state
+    metadata = (config or {}).get("metadata", {})
+    trace_id = state.get("trace_id") or state.get("run_id") or metadata.get("run_id") or metadata.get("trace_id")
+
     tests_ok = test_res.passed if test_res else True
     review_ok = (review_res.verdict == "passed") if review_res else True
 
     if tests_ok and review_ok:
+        record_qa_result(trace_id, status="passed", attempt=current_repairs)
         return {
             "qa_status": "passed",
             "qa_feedback": None,
@@ -154,6 +163,12 @@ def qa_node(state: DevPilotState) -> dict[str, Any]:
     # If issues were detected, check repair budget
     new_repairs = current_repairs + 1
     if new_repairs > 3:
+        record_qa_result(
+            trace_id,
+            status="retry_limit_reached",
+            attempt=new_repairs,
+            feedback="Maximum automated repair attempts (3) exceeded.",
+        )
         return {
             "qa_status": "retry_limit_reached",
             "qa_feedback": "Maximum automated repair attempts (3) exceeded.",
@@ -181,9 +196,11 @@ def qa_node(state: DevPilotState) -> dict[str, Any]:
         if blocking_items:
             feedback_parts.append("Reviewer blocking findings:\n" + "\n".join(blocking_items))
 
+    qa_fb = "\n\n".join(feedback_parts)
+    record_qa_result(trace_id, status="fix_required", attempt=new_repairs, feedback=qa_fb)
     return {
         "qa_status": "fix_required",
-        "qa_feedback": "\n\n".join(feedback_parts),
+        "qa_feedback": qa_fb,
         "repair_attempts": new_repairs,
     }
 
@@ -250,6 +267,15 @@ async def publish_pr_node(
 def route_plan_decision(state: DevPilotState) -> str:
     """Decides next step after human plan checkpoint."""
     decision = state.get("plan_decision", None)
+    trace_id = state.get("trace_id") or state.get("run_id")
+    if decision:
+        record_human_decision(
+            trace_id=trace_id,
+            checkpoint_name="plan_review",
+            decision=decision,
+            comment=state.get("plan_feedback"),
+        )
+
     if decision == "approve":
         return "implementer"
     if decision == "revise":

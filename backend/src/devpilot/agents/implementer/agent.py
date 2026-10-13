@@ -93,7 +93,14 @@ async def implement_node(
         f"Perform all necessary changes, test locally, and produce the ImplementationReport."
     )
 
-    result = await agent.ainvoke({"messages": [HumanMessage(content=task)]})
+    # Pass Langfuse callbacks and agent role tags from config
+    run_config: RunnableConfig = {
+        "callbacks": (config or {}).get("callbacks", []),
+        "tags": list((config or {}).get("tags", [])) + ["agent:implementer"],
+        "metadata": {**((config or {}).get("metadata", {})), "agent_role": "implementer"},
+    }
+
+    result = await agent.ainvoke({"messages": [HumanMessage(content=task)]}, config=run_config)
     structured = result.get("structured_response")
     if isinstance(structured, ImplementationReport):
         report = structured

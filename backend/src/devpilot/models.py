@@ -87,4 +87,6 @@ class DevPilotState(TypedDict, total=False):
     # --- 8. Bookkeeping & Counters ---
     repair_attempts: int  # Number of automated bug fix cycles attempted (capped at 3)
     plan_revisions: int  # Number of times human requested plan revisions
+    trace_id: str | None  # Observability trace identifier
+    run_id: str | None  # Unique workflow execution run identifier
     error: str | None  # High-level failure reason if workflow halts

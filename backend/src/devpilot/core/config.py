@@ -59,8 +59,21 @@ class Settings(BaseSettings):
         description="Max execution duration in seconds per worker",
     )
 
-    # Logging
+    # Observability (Langfuse)
+    LANGFUSE_PUBLIC_KEY: str = Field(default="", description="Langfuse public key")
+    LANGFUSE_SECRET_KEY: str = Field(default="", description="Langfuse secret key")
+    LANGFUSE_HOST: str = Field(
+        default="https://cloud.langfuse.com",
+        description="Langfuse host URL",
+    )
+
+    # Logging & Diagnostics (Pydantic Logfire)
     LOG_LEVEL: str = Field(default="INFO", description="Log level")
+    LOGFIRE_TOKEN: str = Field(default="", description="Logfire write token")
+    LOGFIRE_SEND_TO_LOGFIRE: bool = Field(
+        default=False,
+        description="Whether to export spans and logs to Logfire cloud",
+    )
 
 
 settings = Settings()

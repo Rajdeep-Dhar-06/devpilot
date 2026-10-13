@@ -17,6 +17,9 @@ def test_settings_default_values() -> None:
     assert settings.MAX_QA_REPAIR_ATTEMPTS == 3
     assert settings.WORKER_STEP_LIMIT == 20
     assert settings.WORKER_TIMEOUT_SECONDS == 300
+    assert settings.LANGFUSE_PUBLIC_KEY == ""
+    assert settings.LANGFUSE_SECRET_KEY == ""
+    assert settings.LANGFUSE_HOST == "https://cloud.langfuse.com"
     assert settings.LOG_LEVEL == "INFO"
 
 

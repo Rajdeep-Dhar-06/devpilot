@@ -85,7 +85,14 @@ async def plan_node(state: DevPilotState, config: RunnableConfig | None = None) 
         f"Explore the codebase and output the structured ImplementationPlan."
     )
 
-    result = await agent.ainvoke({"messages": [HumanMessage(content=task)]})
+    # Pass Langfuse callbacks and agent role tags from config
+    run_config: RunnableConfig = {
+        "callbacks": (config or {}).get("callbacks", []),
+        "tags": list((config or {}).get("tags", [])) + ["agent:planner"],
+        "metadata": {**((config or {}).get("metadata", {})), "agent_role": "planner"},
+    }
+
+    result = await agent.ainvoke({"messages": [HumanMessage(content=task)]}, config=run_config)
     structured = result.get("structured_response")
     if isinstance(structured, ImplementationPlan):
         plan = structured

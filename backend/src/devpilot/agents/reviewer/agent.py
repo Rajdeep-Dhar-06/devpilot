@@ -133,7 +133,14 @@ async def run_reviewer(
         f"Focus strictly on {category} aspects and output findings."
     )
 
-    result = await agent.ainvoke({"messages": [HumanMessage(content=task)]})
+    # Pass Langfuse callbacks and agent role tags from config
+    run_config: RunnableConfig = {
+        "callbacks": (config or {}).get("callbacks", []),
+        "tags": list((config or {}).get("tags", [])) + ["agent:reviewer", f"reviewer:{category}"],
+        "metadata": {**((config or {}).get("metadata", {})), "agent_role": "reviewer", "reviewer_category": category},
+    }
+
+    result = await agent.ainvoke({"messages": [HumanMessage(content=task)]}, config=run_config)
     structured = result.get("structured_response")
     raw_findings: list[Finding] = []
     if isinstance(structured, ReviewerOutput):

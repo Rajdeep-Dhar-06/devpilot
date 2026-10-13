@@ -8,10 +8,15 @@ safely inside this environment without touching the host machine.
 
 import contextlib
 import json
+import logging
 from dataclasses import dataclass
 from typing import Any
 
+import logfire
+
 from devpilot.models import WorkspaceInfo
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -153,7 +158,8 @@ class Sandbox:
                     "source": "config",
                 }
             except Exception:
-                pass
+                logfire.warn("devpilot.json found but could not be parsed; falling back to auto-detection")
+                logger.warning("Failed to parse devpilot.json", exc_info=True)
 
         # Auto-detect Python pyproject.toml
         cat_pyproject = self.run("cat pyproject.toml")

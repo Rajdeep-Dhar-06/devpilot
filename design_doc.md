@@ -1,4 +1,4 @@
-# DevPilot Design Doc
+git # DevPilot Design Doc
 
 Living record of architectural decisions made during design mode. No code is written until the user gives an explicit go-ahead.
 
@@ -87,7 +87,7 @@ Living record of architectural decisions made during design mode. No code is wri
   1. Backend core first, UI last.
   2. Thin end-to-end slice of every layer first.
   3. Agent quality first, with infrastructure later.
-  The choice is closest to options 1 and 3: agents and graph first, infrastructure second.
+     The choice is closest to options 1 and 3: agents and graph first, infrastructure second.
 - **Why this one:** The main risk is the agents, the graph and the sandbox, so that is where to learn first.
 - **Trade-offs accepted:** Pause/resume behaviour with Postgres and Celery is verified late. There is no UI and no API during phase 1.
 - **Follow-ups for the structure:** Phase 1 covers `domain/`, `agents/`, `tools/`, `sandbox/`, `rag/`, `integrations/` and `workflows/`. Phase 2 covers `api/`, `services/`, `db/`, `worker/` and the Postgres checkpointer. Later phases cover the frontend, evals and observability. Phase 1 needs a way to run the graph and answer human approvals without the API.
